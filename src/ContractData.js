@@ -35,7 +35,7 @@ class ContractData extends Component {
       });
     }
   }
-
+  //test
   render() {
     // Contract is not yet intialized.
     if (!this.props.contracts[this.props.contract].initialized) {
