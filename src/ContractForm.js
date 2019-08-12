@@ -1,55 +1,44 @@
-import { drizzleConnect } from "drizzle-react";
-import React, { Component } from "react";
-import PropTypes from "prop-types";
+import { drizzleConnect } from 'drizzle-react';
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 
 const translateType = type => {
   switch (true) {
     case /^uint/.test(type):
-      return "number";
+      return 'number';
     case /^string/.test(type) || /^bytes/.test(type):
-      return "text";
+      return 'text';
     case /^bool/.test(type):
-      return "checkbox";
+      return 'checkbox';
     default:
-      return "text";
+      return 'text';
   }
-};
+}
 
 class ContractForm extends Component {
   constructor(props, context) {
     super(props);
 
-    this.handleInputChange = this.handleInputChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
+    const abi = this.contract.abi;
 
-    this.contracts = context.drizzle.contracts;
-    this.utils = context.drizzle.web3.utils;
-
-    // Get the contract ABI
-    const abi = this.contracts[this.props.contract].abi;
-
+    this.state = {};
     this.inputs = [];
-    var initialState = {};
+    this.contract = context.drizzle.contracts.StudentElection;
 
-    // Iterate over abi for correct function.
-    for (var i = 0; i < abi.length; i++) {
+    for (let i = 0; i < abi.length; i++) {
       if (abi[i].name === this.props.method) {
         this.inputs = abi[i].inputs;
 
-        for (var j = 0; j < this.inputs.length; j++) {
-          initialState[this.inputs[j].name] = "";
+        for (let j = 0; j < this.inputs.length; j++) {
+          this.state[this.inputs[j].name] = "";
         }
 
         break;
       }
     }
-
-    this.state = initialState;
   }
 
   handleSubmit(event) {
-    event.preventDefault();
-
     const convertedInputs = this.inputs.map(input => {
       if (input.type === "bytes32") {
         return this.utils.toHex(this.state[input.name]);
@@ -57,64 +46,81 @@ class ContractForm extends Component {
       return this.state[input.name];
     });
 
-    if (this.props.sendArgs) {
-      return this.contracts[this.props.contract].methods[
-        this.props.method
-      ].cacheSend(...convertedInputs, this.props.sendArgs);
-    }
-
-    return this.contracts[this.props.contract].methods[
+    return this.contract.methods[
       this.props.method
-    ].cacheSend(...convertedInputs);
+    ].cacheSend(...convertedInputs), {
+      from: this.props.account
+    }
   }
 
   handleInputChange(event) {
-    const value =
+    let value =
       event.target.type === 'checkbox'
         ? event.target.checked
         : event.target.value;
+    if (/^\d+$/.test(value)) { value = parseInt(value); }
     this.setState({ [event.target.name]: value });
   }
 
   render() {
-    if (this.props.render) {
-      return this.props.render({
-        inputs: this.inputs,
-        inputTypes: this.inputs.map(input => translateType(input.type)),
-        state: this.state,
-        handleInputChange: this.handleInputChange,
-        handleSubmit: this.handleSubmit,
-      });
-    }
-
     return (
-      <form
-        className="pure-form pure-form-stacked"
-        onSubmit={this.handleSubmit}
-      >
+      <form className="pure-form pure-form-stacked">
         {this.inputs.map((input, index) => {
-          var inputType = translateType(input.type);
-          var inputLabel = this.props.labels
+          let inputType = this.translateType(input.type);
+          let inputLabel = this.props.labels
             ? this.props.labels[index]
             : input.name;
-          // check if input type is struct and if so loop out struct fields as well
-          return (
-            <input
-              key={input.name}
-              type={inputType}
-              name={input.name}
-              value={this.state[input.name]}
-              placeholder={inputLabel}
-              onChange={this.handleInputChange}
-            />
-          );
+          let rows;
+
+          if (input.name === 'elecKey') {
+            let elecChoices = [];
+
+            for (let i = 1; i <= this.props.numOfElections; i++) {
+              elecChoices.push(i);
+            }
+            rows = (
+              <div>
+                <label >Election Number#</label>
+                <select onChange={this.handleInputChange} name="Number_Of_Election">
+                  {elecChoices.map(i => {
+                    const optionKey = `Election_Number#${i}`;
+                    return (
+                      <option key={optionKey} value={i}>
+                        {i}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          } else {
+            rows = (
+              <input
+                key={input.name}
+                type={inputType}
+                name={input.name}
+                value={this.state[input.name]}
+                placeholder={inputLabel}
+                onChange={this.handleInputChange}
+              />
+            );
+          }
+
+          if (inputType === 'checkbox') {
+            return (
+              <label key="checkbox">
+                {inputLabel}:{rows}
+              </label>
+            );
+          } else {
+            return rows;
+          }
         })}
         <button
           key="submit"
           className="pure-button"
           type="button"
-          onClick={this.handleSubmit}
-        >
+          onClick={this.handleSubmit}>
           Submit
         </button>
       </form>
@@ -123,24 +129,12 @@ class ContractForm extends Component {
 }
 
 ContractForm.contextTypes = {
-  drizzle: PropTypes.object,
+  drizzle: PropTypes.object
 };
-
-ContractForm.propTypes = {
-  contract: PropTypes.string.isRequired,
-  method: PropTypes.string.isRequired,
-  sendArgs: PropTypes.object,
-  labels: PropTypes.arrayOf(PropTypes.string),
-  render: PropTypes.func,
-};
-
-/*
- * Export connected component.
- */
 
 const mapStateToProps = state => {
   return {
-    contracts: state.contracts,
+    contracts: state.contracts
   };
 };
 

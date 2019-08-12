@@ -1,37 +1,31 @@
-import { drizzleConnect } from "drizzle-react";
-import React, { Component } from "react";
-import PropTypes from "prop-types";
+import { drizzleConnect } from 'drizzle-react';
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
+
+const stateMap = {
+  0: 'Setup',
+  1: 'Ongoing',
+  2: 'Ended'
+};
 
 class ContractData extends Component {
   constructor(props, context) {
     super(props);
 
-    // Fetch initial value from chain and return cache key for reactive updates.
-    var methodArgs = this.props.methodArgs ? this.props.methodArgs : [];
-
-    this.contracts = context.drizzle.contracts;
-    this.state = {
-      dataKey: this.contracts[this.props.contract].methods[
-        this.props.method
-      ].cacheCall(...methodArgs),
-    };
+    this.method =
+      context.drizzle.contracts[this.props.contract].methods[this.props.method];
+    let methodArgs = this.props.methodArgs ? this.props.methodArgs : [];
+    this.state = { dataKey: this.method.cacheCall(...methodArgs) };
   }
 
-  // Will not fix legacy component
-  // eslint-disable-next-line react/no-deprecated
-  componentWillReceiveProps(nextProps) {
-    const { methodArgs, contract, method } = this.props;
-
-    const didContractChange = contract !== nextProps.contract;
-    const didMethodChange = method !== nextProps.method;
-    const didArgsChange =
-      JSON.stringify(methodArgs) !== JSON.stringify(nextProps.methodArgs);
-
-    if (didContractChange || didMethodChange || didArgsChange) {
+  componentDidUpdate(prevProps) {
+    if (
+      this.props.methodArgs &&
+      JSON.stringify(this.props.methodArgs) !==
+        JSON.stringify(prevProps.methodArgs)
+    ) {
       this.setState({
-        dataKey: this.contracts[nextProps.contract].methods[
-          nextProps.method
-        ].cacheCall(...nextProps.methodArgs),
+        dataKey: this.method.cacheCall(...this.props.methodArgs)
       });
     }
   }
@@ -53,18 +47,22 @@ class ContractData extends Component {
     }
 
     // Show a loading spinner for future updates.
-    var pendingSpinner = this.props.contracts[this.props.contract].synced
-      ? ""
-      : " 🔄";
+    let pendingSpinner = this.props.contracts[this.props.contract].synced
+      ? ''
+      : ' 🔄';
 
     // Optionally hide loading spinner (EX: ERC20 token symbol).
     if (this.props.hideIndicator) {
-      pendingSpinner = "";
+      pendingSpinner = '';
     }
 
-    var displayData = this.props.contracts[this.props.contract][
+    let displayData = this.props.contracts[this.props.contract][
       this.props.method
     ][this.state.dataKey].value;
+
+    if (this.props.method === 'getStateOfElection') {
+      displayData = stateMap[displayData];
+    }
 
     // Optionally convert to UTF8
     if (this.props.toUtf8) {
@@ -74,11 +72,6 @@ class ContractData extends Component {
     // Optionally convert to Ascii
     if (this.props.toAscii) {
       displayData = this.context.drizzle.web3.utils.hexToAscii(displayData);
-    }
-
-    // If a render prop is given, have displayData rendered from that component
-    if (this.props.render) {
-      return this.props.render(displayData);
     }
 
     // If return value is an array
@@ -96,19 +89,19 @@ class ContractData extends Component {
     }
 
     // If retun value is an object
-    if (typeof displayData === "object") {
-      var i = 0;
+    if (typeof displayData === 'object' && displayData !== null) {
+      let i = 0;
       const displayObjectProps = [];
 
       Object.keys(displayData).forEach(key => {
-        if (i != key) {
+        if (i !== key) {
           displayObjectProps.push(
             <li key={i}>
               <strong>{key}</strong>
               {pendingSpinner}
               <br />
               {`${displayData[key]}`}
-            </li>,
+            </li>
           );
         }
 
@@ -128,18 +121,7 @@ class ContractData extends Component {
 }
 
 ContractData.contextTypes = {
-  drizzle: PropTypes.object,
-};
-
-ContractData.propTypes = {
-  contracts: PropTypes.object.isRequired,
-  contract: PropTypes.string.isRequired,
-  method: PropTypes.string.isRequired,
-  methodArgs: PropTypes.array,
-  hideIndicator: PropTypes.bool,
-  toUtf8: PropTypes.bool,
-  toAscii: PropTypes.bool,
-  render: PropTypes.func,
+  drizzle: PropTypes.object
 };
 
 /*
@@ -148,7 +130,7 @@ ContractData.propTypes = {
 
 const mapStateToProps = state => {
   return {
-    contracts: state.contracts,
+    contracts: state.contracts
   };
 };
 
